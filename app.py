@@ -50,6 +50,9 @@ def is_pdf(upload: UploadFile, content: bytes) -> bool:
         and content.startswith(b"%PDF-")
     )
 
+
+
+
 @app.post("/extract")
 async def extract(file: UploadFile = File(...)):
     pdf_bytes = await file.read()
