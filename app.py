@@ -11,7 +11,7 @@ config = oci.config.from_file()
 doc_client = oci.ai_document.AIServiceDocumentClient(config)
 
 
-#היא נרשמת אוטומטית כ־“handler” לכל שגיאות מהסוג הזה (HTTPException).
+#“ה־http_exception_handler מאפשר טיפול מרכזי ואחיד בשגיאות HTTP, בלי לחזור על אותו קוד בכל endpoint.”
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
     return JSONResponse(
@@ -58,8 +58,6 @@ async def extract(file: UploadFile = File(...)):
             oci.ai_document.models.DocumentClassificationFeature(max_results=5),
         ],
     )
-
-    before = time.time()
     # (4) 503
     try:
         response = doc_client.analyze_document(request)
@@ -68,29 +66,24 @@ async def extract(file: UploadFile = File(...)):
             status_code=503,
             detail="The service is currently unavailable. Please try again later."
         )
-    after = time.time()
-    prediction_time = round(after - before, 3)
     data = {}
-    data_confidence = {}   # שקיפות ושליטה ברמת שדה בודד
-    all_confidences = []   # לחשב את רמת הביטחון הכוללת למסמך
-    overall_confidence = 0.0
+    data_confidence = {} 
+    confidence = 0.0
 
     for page in (response.data.pages or []):
         for field in (getattr(page, "document_fields", None) or []):
-
-            # גישה בטוחה ל-label
             label = getattr(field, "field_label", None)
             field_name = getattr(label, "name", None)
             field_confidence = getattr(label, "confidence", None)
 
-            field_value_obj = getattr(field, "field_value", None)
-            field_value = getattr(field_value_obj, "text", None) if field_value_obj else None
+            field_value = getattr(field, "field_value", None)
+            field_value_text = getattr(field_value, "text", None) 
 
             if field.field_type == "LINE_ITEM_GROUP":
                 items = []
-                rows = getattr(field_value_obj, "items", None) or []
+                rows = getattr(field_value, "items", None) or [] #כל השורות של ה־ Items בתוך החשבונית
 
-                for row in rows:
+                for row in rows: #
                     item = {
                         "Description": None,
                         "Name": None,
@@ -99,36 +92,32 @@ async def extract(file: UploadFile = File(...)):
                         "Amount": None,
                     }
 
-                    row_value_obj = getattr(row, "field_value", None)
-                    cols = getattr(row_value_obj, "items", None) or []
+                    row_value_obj = getattr(row, "field_value", None) #הערכים של הפריט
+                    cols = getattr(row_value_obj, "items", None) or [] #כל העמודות/השדות של הפריט
 
-                    for c in cols:
-                        # ✅ כאן היה הכשל אצלך: לא נוגעים ב-confidence בלי getattr
-                        c_label = getattr(c, "field_label", None)
+                    for c in cols: 
+                        c_label = getattr(c, "field_label", None) 
                         c_conf = getattr(c_label, "confidence", None)
-                        if c_conf is not None:
-                            all_confidences.append(c_conf)
-
-                        k = getattr(c_label, "name", None)
-                        v_obj = getattr(c, "field_value", None)
-                        v = getattr(v_obj, "text", None) if v_obj else None
+                        k = getattr(c_label, "name", None) #שם השדה בעמודה
+                        v_obj = getattr(c, "field_value", None) #הערך של השדה בעמודה
+                        v = getattr(v_obj, "text", None) if v_obj else None #הטקסט של הערך בעמודה
 
                         # ניקוי ערכים מספריים
-                        if k in ("Quantity", "UnitPrice", "Amount") and v:
-                            v2 = re.sub(r"[^\d.]", "", v)
-                            v = float(v2) if v2 else None
+                        if k in ("UnitPrice", "Amount"):
+                            v = clean_money(v)
+                        elif k == "Quantity":
+                            v = int(clean_money(v)) if clean_money(v) is not None else None
 
                         if k in item:
-                            item[k] = v
+                            item[k] = v #הכנסת הערך המתאים לשדה המתאים במילון הפריט  
 
-                    items.append(item)
+                    items.append(item) # הוספת הפריט לרשימת הפריטים
 
                 data["Items"] = items
 
-            elif field_name:
-                v = field_value
+            elif field_name: # אם יש שם שדה תקין
+                v = field_value_text #הטקסט של הערך של השדה
 
-                # כל השדות הכספיים/מספריים שצריכים להיות float (כמו שהטסט מצפה)
                 money_fields = {"SubTotal", "ShippingCost", "InvoiceTotal", "AmountDue"}
                 if field_name in money_fields and v:
                     v = clean_money(v)
@@ -136,24 +125,21 @@ async def extract(file: UploadFile = File(...)):
                 data[field_name] = v
                 data_confidence[field_name] = field_confidence
 
-                if field_confidence is not None:
-                    all_confidences.append(field_confidence)
     if response.data.detected_document_types:
         for doc_type in response.data.detected_document_types:
-            overall_confidence = doc_type.confidence if doc_type.confidence is not None else 0.0
+            confidence = doc_type.confidence if doc_type.confidence is not None else 0.0
    
     # continue (3) 400
-    if overall_confidence < 0.9:
+    if confidence < 0.9:
         raise HTTPException(
             status_code=400,
             detail="Invalid document. Please upload a valid PDF invoice with high confidence."
         )
 
     result = {
-        "confidence": overall_confidence,
+        "confidence": confidence,
         "data": data,
         "dataConfidence": data_confidence,
-        "predictionTime": prediction_time,
     }
 
     save_inv_extraction(result)
@@ -167,17 +153,17 @@ def health():
 
 @app.get('/invoice/{invoice_id}')
 def get_invoice_by_id(invoice_id: str):
-    with get_db() as conn:
-        cursor = conn.cursor()
+    with get_db() as conn: #ניהול חיבור לבסיס הנתונים
+        cursor = conn.cursor() #מצביע (cursor) שרץ על מסד הנתונים ומבצע פקודות SQL
 
         cursor.execute("""
             SELECT InvoiceId, VendorName, InvoiceDate, BillingAddressRecipient,
                    ShippingAddress, SubTotal, ShippingCost, InvoiceTotal
             FROM invoices
-            WHERE InvoiceId = ?
-        """, (invoice_id,))
-        row = cursor.fetchone()
-
+            WHERE InvoiceId = ? 
+        """, (invoice_id,)) #,כי SQLite מצפה ל־ tuple/ של פרמטרים ? = אבטחה ויציבות
+       
+        row = cursor.fetchone() #Tuple
         if not row:
             raise HTTPException(status_code=404, detail="Invoice not found")
 
