@@ -4,7 +4,7 @@ import oci
 import base64
 import re
 from db_util import get_db, init_db, save_inv_extraction
-
+import time
 app = FastAPI()
 
 config = oci.config.from_file()
@@ -59,6 +59,7 @@ async def extract(file: UploadFile = File(...)):
         ],
     )
 
+    before = time.time()
     # (4) 503
     try:
         response = doc_client.analyze_document(request)
@@ -67,7 +68,8 @@ async def extract(file: UploadFile = File(...)):
             status_code=503,
             detail="The service is currently unavailable. Please try again later."
         )
-
+    after = time.time()
+    prediction_time = round(after - before, 3)
     data = {}
     data_confidence = {}   # שקיפות ושליטה ברמת שדה בודד
     all_confidences = []   # לחשב את רמת הביטחון הכוללת למסמך
@@ -150,7 +152,8 @@ async def extract(file: UploadFile = File(...)):
     result = {
         "confidence": overall_confidence,
         "data": data,
-        "dataConfidence": data_confidence
+        "dataConfidence": data_confidence,
+        "predictionTime": prediction_time,
     }
 
     save_inv_extraction(result)
