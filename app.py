@@ -5,36 +5,13 @@ import base64
 import re
 from db_util import get_db, init_db, save_inv_extraction
 
-"""
-echo "[" > all_invoices.json
-first=1
-
-for f in invoices_sample/*.pdf; do
-  [ $first -eq 0 ] && echo "," >> all_invoices.json
-  first=0
-
-  curl -s -X POST "http://127.0.0.1:8080/extract" \
-       -F "file=@$f" >> all_invoices.json
-done
-
-echo "]" >> all_invoices.json
-
-python -m json.tool all_invoices.json > tmp.json && mv tmp.json all_invoices.json
-"""
-"""
-for f in invoices_sample/*.pdf; do
-  echo "Sending $f"
-  curl -X POST "http://127.0.0.1:8080/extract" -F "file=@$f"
-  echo ""
-done
-"""    
-
 app = FastAPI()
 
 config = oci.config.from_file()
 doc_client = oci.ai_document.AIServiceDocumentClient(config)
 
-#טיפול בשגיאות HTTP
+
+#היא נרשמת אוטומטית כ־“handler” לכל שגיאות מהסוג הזה (HTTPException).
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
     return JSONResponse(
@@ -42,7 +19,8 @@ async def http_exception_handler(request: Request, exc: HTTPException):
         content={"error": str(exc.detail)}
     )
 
-#
+
+# אם הקובץ PDF תקין
 def is_pdf(upload: UploadFile, content: bytes) -> bool:
     return (
         (upload.content_type == "application/pdf"
@@ -51,20 +29,26 @@ def is_pdf(upload: UploadFile, content: bytes) -> bool:
     )
 
 
+# ניקוי ערכים מ $, רווחים וכו'ומחזיומחיר float
+def clean_money(value: str):
+    if not value:
+        return None
+    v = re.sub(r"[^\d.]", "", value)
+    return float(v) if v else None
 
 
 @app.post("/extract")
 async def extract(file: UploadFile = File(...)):
     pdf_bytes = await file.read()
+
     # (3) 400
     if not pdf_bytes or not is_pdf(file, pdf_bytes):
-            raise HTTPException(
-                status_code=400,
-                detail="Invalid document. Please upload a valid PDF invoice with high confidence."
-            )
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid document. Please upload a valid PDF invoice with high confidence."
+        )
 
     encoded_pdf = base64.b64encode(pdf_bytes).decode("utf-8")
-
     document = oci.ai_document.models.InlineDocumentDetails(data=encoded_pdf)
 
     request = oci.ai_document.models.AnalyzeDocumentDetails(
@@ -74,6 +58,7 @@ async def extract(file: UploadFile = File(...)):
             oci.ai_document.models.DocumentClassificationFeature(max_results=5),
         ],
     )
+
     # (4) 503
     try:
         response = doc_client.analyze_document(request)
@@ -84,86 +69,104 @@ async def extract(file: UploadFile = File(...)):
         )
 
     data = {}
-    data_confidence = {} #שקיפות ושליטה ברמת שדה בודד
-    all_confidences = [] #לחשב את רמת הביטחון הכוללת למסמך  
+    data_confidence = {}   # שקיפות ושליטה ברמת שדה בודד
+    all_confidences = []   # לחשב את רמת הביטחון הכוללת למסמך
+    overall_confidence = 0.0
 
-    for page in response.data.pages: # for page in (response.data.pages or []):
-        if page.document_fields:
-            for field in page.document_fields:
-                field_name = field.field_label.name if field.field_label else None
-                field_confidence = field.field_label.confidence if field.field_label else None
-                field_value = field.field_value.text if field.field_value else None
+    for page in (response.data.pages or []):
+        for field in (getattr(page, "document_fields", None) or []):
 
-                if field.field_type == "LINE_ITEM_GROUP":
-                    items = []
-                    rows = field.field_value.items if field.field_value else [] # שורות של כל הפריטים
+            # גישה בטוחה ל-label
+            label = getattr(field, "field_label", None)
+            field_name = getattr(label, "name", None)
+            field_confidence = getattr(label, "confidence", None)
 
-                    for row in rows: # עבור כל שורה בטבלה
-                        item = {
-                            "Description": None,
-                            "Name": None,
-                            "Quantity": None,
-                            "UnitPrice": None,
-                            "Amount": None,
-                        }
+            field_value_obj = getattr(field, "field_value", None)
+            field_value = getattr(field_value_obj, "text", None) if field_value_obj else None
 
-                        cols = row.field_value.items if row.field_value else [] # עמודות / שדות של כל שורה בתוך כל Item
-                        for c in cols: # עבור כל עמודה בשורה, Quantity, UnitPrice וכו'
-                            if c.field_label and c.field_label.confidence is not None:   
-                                all_confidences.append(c.field_label.confidence)
-                            k = c.field_label.name if c.field_label else None # שם השדה
-                            v = c.field_value.text if c.field_value else None # ערך השדה
-                            # ניקוי ערכים מספריים
-                            if k in ("Quantity", "UnitPrice", "Amount") and v:
-                                v2 = re.sub(r"[^\d.]", "", v) # הסרת תווים לא מספריים
-                                v = float(v2) if v2 else None
+            if field.field_type == "LINE_ITEM_GROUP":
+                items = []
+                rows = getattr(field_value_obj, "items", None) or []
 
-                            if k in item:
-                                item[k] = v
+                for row in rows:
+                    item = {
+                        "Description": None,
+                        "Name": None,
+                        "Quantity": None,
+                        "UnitPrice": None,
+                        "Amount": None,
+                    }
 
-                        items.append(item)
+                    row_value_obj = getattr(row, "field_value", None)
+                    cols = getattr(row_value_obj, "items", None) or []
 
-                    data["Items"] = items
+                    for c in cols:
+                        # ✅ כאן היה הכשל אצלך: לא נוגעים ב-confidence בלי getattr
+                        c_label = getattr(c, "field_label", None)
+                        c_conf = getattr(c_label, "confidence", None)
+                        if c_conf is not None:
+                            all_confidences.append(c_conf)
 
-                elif field_name:
-                    data[field_name] = field_value
-                    data_confidence[field_name] = field_confidence
-                    if field_confidence is not None:
-                        all_confidences.append(field_confidence)
+                        k = getattr(c_label, "name", None)
+                        v_obj = getattr(c, "field_value", None)
+                        v = getattr(v_obj, "text", None) if v_obj else None
 
-    overall_confidence = round(sum(all_confidences) / len(all_confidences), 3) if all_confidences else 0.0
-    #continue (3) 400
+                        # ניקוי ערכים מספריים
+                        if k in ("Quantity", "UnitPrice", "Amount") and v:
+                            v2 = re.sub(r"[^\d.]", "", v)
+                            v = float(v2) if v2 else None
+
+                        if k in item:
+                            item[k] = v
+
+                    items.append(item)
+
+                data["Items"] = items
+
+            elif field_name:
+                v = field_value
+
+                # כל השדות הכספיים/מספריים שצריכים להיות float (כמו שהטסט מצפה)
+                money_fields = {"SubTotal", "ShippingCost", "InvoiceTotal", "AmountDue"}
+                if field_name in money_fields and v:
+                    v = clean_money(v)
+
+                data[field_name] = v
+                data_confidence[field_name] = field_confidence
+
+                if field_confidence is not None:
+                    all_confidences.append(field_confidence)
+    if response.data.detected_document_types:
+        for doc_type in response.data.detected_document_types:
+            overall_confidence = doc_type.confidence if doc_type.confidence is not None else 0.0
+   
+    # continue (3) 400
     if overall_confidence < 0.9:
-        raise HTTPException(status_code=400,detail=("Invalid document. Please upload a valid PDF invoice with high confidence."))
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid document. Please upload a valid PDF invoice with high confidence."
+        )
 
     result = {
         "confidence": overall_confidence,
         "data": data,
         "dataConfidence": data_confidence
-    }   
+    }
+
     save_inv_extraction(result)
     return result
 
 
 @app.get('/health')
 def health():
-    return {"status": "ok"} 
+    return {"status": "ok"}
 
 
 @app.get('/invoice/{invoice_id}')
-async def invoice(invoice_id: str):
-    inv = get_invoice_by_id(invoice_id)
-
-    if not inv:
-        raise HTTPException(status_code=404, detail="Invoice not found")
-
-    return inv
-
 def get_invoice_by_id(invoice_id: str):
     with get_db() as conn:
         cursor = conn.cursor()
 
-        # ✅ SELECT invoice header
         cursor.execute("""
             SELECT InvoiceId, VendorName, InvoiceDate, BillingAddressRecipient,
                    ShippingAddress, SubTotal, ShippingCost, InvoiceTotal
@@ -173,7 +176,7 @@ def get_invoice_by_id(invoice_id: str):
         row = cursor.fetchone()
 
         if not row:
-            return None
+            raise HTTPException(status_code=404, detail="Invoice not found")
 
         invoice = {
             "InvoiceId": row[0],
@@ -186,7 +189,6 @@ def get_invoice_by_id(invoice_id: str):
             "InvoiceTotal": row[7],
         }
 
-        # ✅ SELECT line items
         cursor.execute("""
             SELECT Description, Name, Quantity, UnitPrice, Amount
             FROM items
@@ -209,8 +211,7 @@ def get_invoice_by_id(invoice_id: str):
         return invoice
 
 
-
-@app.get('/invoices/vendor/{vendor_name}')
+@app.get("/invoices/vendor/{vendor_name}")
 async def invoices_by_vendor(vendor_name: str):
     invoices = get_invoices_by_vendor(vendor_name)
 
@@ -227,11 +228,11 @@ async def invoices_by_vendor(vendor_name: str):
         "invoices": invoices
     }
 
+
 def get_invoices_by_vendor(vendor_name: str):
     with get_db() as conn:
         cursor = conn.cursor()
 
-        # ✅ SELECT all invoices ids for vendor
         cursor.execute("""
             SELECT InvoiceId
             FROM invoices
@@ -240,7 +241,6 @@ def get_invoices_by_vendor(vendor_name: str):
         """, (vendor_name,))
         invoice_ids = [r[0] for r in cursor.fetchall()]
 
-    # מחוץ ל-conn (או אפשר בתוך אותו conn) — נביא כל חשבונית עם items
     invoices = []
     for inv_id in invoice_ids:
         inv = get_invoice_by_id(inv_id)
@@ -248,6 +248,7 @@ def get_invoices_by_vendor(vendor_name: str):
             invoices.append(inv)
 
     return invoices
+
 
 if __name__ == "__main__":
     import uvicorn
