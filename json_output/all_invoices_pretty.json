@@ -1,0 +1,203 @@
+[
+    {
+        "confidence": 1,
+        "data": {
+            "VendorName": "SuperStore",
+            "VendorNameLogo": "SuperStore",
+            "InvoiceId": "36259",
+            "InvoiceDate": "Mar 06 2012",
+            "ShippingAddress": "98103, Seattle, Washington, United States",
+            "BillingAddressRecipient": "Aaron Bergman",
+            "AmountDue": 58.11,
+            "SubTotal": 53.82,
+            "ShippingCost": 4.29,
+            "InvoiceTotal": 58.11,
+            "Items": [
+                {
+                    "Description": "Newell 330 Art, Office Supplies, OFF-AR-5309",
+                    "Name": "Newell 330 Art, Office Supplies, OFF-AR-5309",
+                    "Quantity": 3.0,
+                    "UnitPrice": 17.94,
+                    "Amount": 53.82
+                }
+            ]
+        },
+        "dataConfidence": {
+            "VendorName": 0.9491271,
+            "VendorNameLogo": 0.9491271,
+            "InvoiceId": 0.9995704,
+            "InvoiceDate": 0.9999474,
+            "ShippingAddress": 0.9818857,
+            "BillingAddressRecipient": 0.9970944,
+            "AmountDue": 0.9994609,
+            "SubTotal": 0.90709054,
+            "ShippingCost": 0.98618066,
+            "InvoiceTotal": 0.9974165
+        }
+    },
+    {
+        "confidence": 1,
+        "data": {
+            "VendorName": "SuperStore",
+            "VendorNameLogo": "SuperStore",
+            "InvoiceId": "36552",
+            "InvoiceDate": "Mar 05 2013",
+            "ShippingAddress": "18018, Bethlehem, Pennsylvania, United States",
+            "BillingAddressRecipient": "Alan Haines",
+            "AmountDue": 58.35,
+            "SubTotal": null,
+            "ShippingCost": 4.64,
+            "InvoiceTotal": 58.35,
+            "Items": [
+                {
+                    "Description": "36X48 HARDFLOOR CHAIRMAT ishings, Furniture, FUR-FU-2864",
+                    "Name": "36X48 HARDFLOOR CHAIRMAT ishings, Furniture, FUR-FU-2864",
+                    "Quantity": 2.0,
+                    "UnitPrice": 33.57,
+                    "Amount": 67.14
+                },
+                {
+                    "Description": "Sul",
+                    "Name": "Sul",
+                    "Quantity": null,
+                    "UnitPrice": null,
+                    "Amount": 67.14
+                }
+            ]
+        },
+        "dataConfidence": {
+            "VendorName": 0.9776902,
+            "VendorNameLogo": 0.9776902,
+            "InvoiceId": 0.9999351,
+            "InvoiceDate": 0.9998482,
+            "ShippingAddress": 0.9957718,
+            "BillingAddressRecipient": 0.99926513,
+            "AmountDue": 0.624157,
+            "SubTotal": null,
+            "ShippingCost": 0.99503726,
+            "InvoiceTotal": 0.98594284
+        }
+    },
+    {
+        "confidence": 1,
+        "data": {
+            "VendorName": "SuperStore",
+            "VendorNameLogo": "SuperStore",
+            "InvoiceId": "38655",
+            "InvoiceDate": "Dec 29 2012",
+            "ShippingAddress": "19143, Philadelphia, Pennsylvania, United States",
+            "BillingAddressRecipient": "Alex Russell",
+            "AmountDue": null,
+            "SubTotal": null,
+            "ShippingCost": 28.56,
+            "InvoiceTotal": 935.63,
+            "Items": [
+                {
+                    "Description": "ClearSounds CSC500 de nones, Technology, TE PH-3827",
+                    "Name": "ClearSounds CSC500 de nones, Technology, TE PH-3827",
+                    "Quantity": 9.0,
+                    "UnitPrice": 251.96,
+                    "Amount": null
+                },
+                {
+                    "Description": null,
+                    "Name": null,
+                    "Quantity": null,
+                    "UnitPrice": null,
+                    "Amount": null
+                }
+            ]
+        },
+        "dataConfidence": {
+            "VendorName": 0.9838829,
+            "VendorNameLogo": 0.9838829,
+            "InvoiceId": 0.9993784,
+            "InvoiceDate": 0.999916,
+            "ShippingAddress": 0.9920588,
+            "BillingAddressRecipient": 0.99917084,
+            "AmountDue": null,
+            "SubTotal": null,
+            "ShippingCost": 0.96031564,
+            "InvoiceTotal": 0.9787045
+        }
+    },
+    {
+        "confidence": 1,
+        "data": {
+            "VendorName": "SuperStore",
+            "VendorNameLogo": "SuperStore",
+            "InvoiceId": "35318",
+            "InvoiceDate": "Jun 21 2012",
+            "ShippingAddress": "19013, Chester, Pennsylvania, United States",
+            "BillingAddressRecipient": null,
+            "AmountDue": 157.37,
+            "SubTotal": null,
+            "ShippingCost": 8.36,
+            "InvoiceTotal": 157.37,
+            "Items": [
+                {
+                    "Description": "Panasonic Kx-TS550 Phones, Technology, TEC-PH-5566",
+                    "Name": "Panasonic Kx-TS550 Phones, Technology, TEC-PH-5566",
+                    "Quantity": 3.0,
+                    "UnitPrice": 82.78,
+                    "Amount": 248.35
+                },
+                {
+                    "Description": null,
+                    "Name": null,
+                    "Quantity": null,
+                    "UnitPrice": null,
+                    "Amount": 248.35
+                }
+            ]
+        },
+        "dataConfidence": {
+            "VendorName": 0.95504624,
+            "VendorNameLogo": 0.95504624,
+            "InvoiceId": 0.9996334,
+            "InvoiceDate": 0.99989593,
+            "ShippingAddress": 0.9998233,
+            "BillingAddressRecipient": null,
+            "AmountDue": 0.69264007,
+            "SubTotal": null,
+            "ShippingCost": 0.9879584,
+            "InvoiceTotal": 0.97781485
+        }
+    },
+    {
+        "confidence": 1,
+        "data": {
+            "VendorName": "SuperStore",
+            "VendorNameLogo": "SuperStore",
+            "InvoiceId": "37594",
+            "InvoiceDate": "Dec 27 2012",
+            "ShippingAddress": "1915, Beverly, Massachusetts, United States",
+            "BillingAddressRecipient": "Anthony Jacobs",
+            "AmountDue": 578.38,
+            "SubTotal": 567.04,
+            "ShippingCost": 11.34,
+            "InvoiceTotal": 578.38,
+            "Items": [
+                {
+                    "Description": "Xerox 1906 Paper, Office Supplies, OFF-PA-6457",
+                    "Name": "Xerox 1906 Paper, Office Supplies, OFF-PA-6457",
+                    "Quantity": 4.0,
+                    "UnitPrice": 141.76,
+                    "Amount": 567.04
+                }
+            ]
+        },
+        "dataConfidence": {
+            "VendorName": 0.9536724,
+            "VendorNameLogo": 0.9536724,
+            "InvoiceId": 0.9998075,
+            "InvoiceDate": 0.9999503,
+            "ShippingAddress": 0.9982404,
+            "BillingAddressRecipient": 0.99751246,
+            "AmountDue": 0.9995701,
+            "SubTotal": 0.8846961,
+            "ShippingCost": 0.9716412,
+            "InvoiceTotal": 0.9962868
+        }
+    }
+]
