@@ -20,7 +20,7 @@ async def http_exception_handler(request: Request, exc: HTTPException):
     )
 
 
-# אם הקובץ PDF תקין
+# לוודא שהקובץ שהועלה הוא PDF תקין.
 def is_pdf(upload: UploadFile, content: bytes) -> bool:
     return (
         (upload.content_type == "application/pdf"
@@ -29,7 +29,7 @@ def is_pdf(upload: UploadFile, content: bytes) -> bool:
     )
 
 
-# ניקוי ערכים מ $, רווחים וכו'ומחזיומחיר float
+# לנקות ערכים כספיים מסימנים 
 def clean_money(value: str):
     if not value:
         return None
@@ -83,7 +83,7 @@ async def extract(file: UploadFile = File(...)):
                 items = []
                 rows = getattr(field_value, "items", None) or [] #כל השורות של ה־ Items בתוך החשבונית
 
-                for row in rows: #
+                for row in rows: 
                     item = {
                         "Description": None,
                         "Name": None,
@@ -92,14 +92,13 @@ async def extract(file: UploadFile = File(...)):
                         "Amount": None,
                     }
 
-                    row_value_obj = getattr(row, "field_value", None) #הערכים של הפריט
+                    row_value_obj = getattr(row, "field_value", None)
                     cols = getattr(row_value_obj, "items", None) or [] #כל העמודות/השדות של הפריט
 
                     for c in cols: 
                         c_label = getattr(c, "field_label", None) 
-                        c_conf = getattr(c_label, "confidence", None)
                         k = getattr(c_label, "name", None) #שם השדה בעמודה
-                        v_obj = getattr(c, "field_value", None) #הערך של השדה בעמודה
+                        v_obj = getattr(c, "field_value", None) 
                         v = getattr(v_obj, "text", None) if v_obj else None #הטקסט של הערך בעמודה
 
                         # ניקוי ערכים מספריים
