@@ -117,3 +117,14 @@ def save_inv_extraction(result):
                     item.get("UnitPrice"),
                     item.get("Amount")
                 ))
+                
+def clean_db():
+    """Remove all test data so each test starts clean."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM items")
+        cursor.execute("DELETE FROM confidences")
+        cursor.execute("DELETE FROM invoices")
+
+
+        
