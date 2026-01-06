@@ -7,8 +7,10 @@ from db_util import get_db, init_db, save_inv_extraction
 import time
 app = FastAPI()
 
-config = oci.config.from_file()
-doc_client = oci.ai_document.AIServiceDocumentClient(config)
+def get_oci_client():  # pragma: no cover
+     config = oci.config.from_file()
+     doc_client = oci.ai_document.AIServiceDocumentClient(config)
+     return doc_client
 
 
 #“ה־http_exception_handler מאפשר טיפול מרכזי ואחיד בשגיאות HTTP, בלי לחזור על אותו קוד בכל endpoint.”
@@ -60,7 +62,8 @@ async def extract(file: UploadFile = File(...)):
     )
     # (4) 503
     try:
-        response = doc_client.analyze_document(request)
+        response = get_oci_client().analyze_document(request)
+        #response = doc_client.analyze_document(request)
     except Exception:
         raise HTTPException(
             status_code=503,

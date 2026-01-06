@@ -10,21 +10,25 @@ class TestInvoiceExtraction(unittest.TestCase):
 
     def setUp(self):
         init_db()
-    
-        # Patch OCI before importing app (important!)
-        self.patcher_cfg = patch("oci.config.from_file", return_value={})
-        self.patcher_client = patch("oci.ai_document.AIServiceDocumentClient")
-        self.mock_cfg = self.patcher_cfg.start()
-        self.mock_client_class = self.patcher_client.start()
 
-        mock_client_instance = MagicMock()
-        self.mock_client_class.return_value = mock_client_instance
+        # Import app safely (now it won't try to read ~/.oci/config on import)
+        import app as app_module
+        importlib.reload(app_module)
 
-        # Build OCI response similar to what your app expects
+        # Patch get_oci_client on the loaded module (survives reload correctly)
+        self.patcher_get_client = patch.object(app_module, "get_oci_client")
+        self.mock_get_client = self.patcher_get_client.start()
+
+        # Fake OCI client returned by get_oci_client()
+        self.mock_doc_client = MagicMock()
+        self.mock_get_client.return_value = self.mock_doc_client
+
+        # Helper for building OCI-like objects
         def obj(**kwargs):
             return type("obj", (), kwargs)()
 
-        mock_client_instance.analyze_document.return_value = obj(
+        # Build analyze_document return value with .data.pages and .data.detected_document_types
+        self.mock_doc_client.analyze_document.return_value = obj(
             data=obj(
                 detected_document_types=[obj(document_type="INVOICE", confidence=1.0)],
                 pages=[
@@ -38,7 +42,8 @@ class TestInvoiceExtraction(unittest.TestCase):
                                 field_value=obj(value="36259", text="36259")),
                             obj(field_type="KEY_VALUE",
                                 field_label=obj(name="InvoiceDate", confidence=0.99),
-                                field_value=obj(value="2012-03-06T00:00:00+00:00", text="2012-03-06T00:00:00+00:00")),
+                                field_value=obj(value="2012-03-06T00:00:00+00:00",
+                                                text="2012-03-06T00:00:00+00:00")),
                             obj(field_type="KEY_VALUE",
                                 field_label=obj(name="ShippingAddress", confidence=0.98),
                                 field_value=obj(value="98103, Seattle, Washington, United States",
@@ -56,7 +61,6 @@ class TestInvoiceExtraction(unittest.TestCase):
                                 field_label=obj(name="InvoiceTotal", confidence=0.99),
                                 field_value=obj(value=58.11, text="58.11")),
 
-                            # One line item group
                             obj(field_type="LINE_ITEM_GROUP",
                                 field_label=obj(name="Items", confidence=None),
                                 field_value=obj(
@@ -83,14 +87,11 @@ class TestInvoiceExtraction(unittest.TestCase):
             )
         )
 
-        import app as app_module
-        importlib.reload(app_module)
         self.client = TestClient(app_module.app)
 
     def tearDown(self):
         clean_db()
-        self.patcher_client.stop()
-        self.patcher_cfg.stop()
+        self.patcher_get_client.stop()
 
     def test_extract_endpoint_fail_empty_file_returns_400(self):
         # קובץ ריק
@@ -114,7 +115,7 @@ class TestInvoiceExtraction(unittest.TestCase):
 
     def test_extract_endpoint_fail_oci_service_unavailable_returns_503(self):
         # לגרום ל-OCI לזרוק חריגה
-        self.mock_client_class.return_value.analyze_document.side_effect = Exception("OCI down")
+        self.mock_doc_client.analyze_document.side_effect = Exception("OCI down")
 
         with open("invoices_sample/invoice_Aaron_Bergman_36259.pdf", "rb") as f:
             response = self.client.post(
@@ -164,7 +165,7 @@ class TestInvoiceExtraction(unittest.TestCase):
 
     def test_extract_endpoint_fail_low_confidence(self):
         # Arrange: להחליף את ה-mock ל-confidence נמוך
-        self.mock_client_class.return_value.analyze_document.return_value.data.detected_document_types[0].confidence = 0.4
+        self.mock_doc_client.analyze_document.return_value.data.detected_document_types[0].confidence = 0.4
 
         with open("invoices_sample/invoice_Aaron_Bergman_36259.pdf", "rb") as f:
             response = self.client.post(
