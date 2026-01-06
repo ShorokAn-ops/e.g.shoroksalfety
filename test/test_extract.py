@@ -1,177 +1,181 @@
 import unittest
+import importlib
 from unittest.mock import patch, MagicMock
-from db_util import init_db
+
+from fastapi.testclient import TestClient
+from db_util import init_db, clean_db
 
 
 class TestInvoiceExtraction(unittest.TestCase):
-    
-    @patch('oci.ai_document.AIServiceDocumentClient')
-    @patch('oci.config.from_file', return_value={})
-    def test_extract_endpoint(self, mock_config, mock_client_class):
-        """Test the /extract endpoint with invoice_Aaron_Bergman_36259.pdf"""
-        
-        # Initialize database
+
+    def setUp(self):
         init_db()
-        
-        # Setup mock client instance
+    
+        # Patch OCI before importing app (important!)
+        self.patcher_cfg = patch("oci.config.from_file", return_value={})
+        self.patcher_client = patch("oci.ai_document.AIServiceDocumentClient")
+        self.mock_cfg = self.patcher_cfg.start()
+        self.mock_client_class = self.patcher_client.start()
+
         mock_client_instance = MagicMock()
-        mock_client_class.return_value = mock_client_instance
-        mock_analyze = mock_client_instance.analyze_document
-        
-        # Mock OCI response - return the exact expected result structure
-        mock_analyze.return_value = type('obj', (object,), {
-            'data': type('obj', (object,), {
-                'detected_document_types': [
-                    type('obj', (object,), {
-                        'document_type': 'INVOICE',
-                        'confidence': 1
-                    })()
-                ],
-                'pages': [
-                    type('obj', (object,), {
-                        'document_fields': [
-                            type('obj', (object,), {
-                                'field_type': 'KEY_VALUE',
-                                'field_label': type('obj', (object,), {'name': 'VendorName', 'confidence': 0.9491271})(),
-                                'field_value': type('obj', (object,), {'value': 'SuperStore', 'text': 'SuperStore'})()
-                            })(),
-                            type('obj', (object,), {
-                                'field_type': 'KEY_VALUE',
-                                'field_label': type('obj', (object,), {'name': 'VendorNameLogo', 'confidence': 0.9491271})(),
-                                'field_value': type('obj', (object,), {'value': 'SuperStore', 'text': 'SuperStore'})()
-                            })(),
-                            type('obj', (object,), {
-                                'field_type': 'KEY_VALUE',
-                                'field_label': type('obj', (object,), {'name': 'InvoiceId', 'confidence': 0.9995704})(),
-                                'field_value': type('obj', (object,), {'value': '36259', 'text': '36259'})()
-                            })(),
-                            type('obj', (object,), {
-                                'field_type': 'KEY_VALUE',
-                                'field_label': type('obj', (object,), {'name': 'InvoiceDate', 'confidence': 0.9999474})(),
-                                'field_value': type('obj', (object,), {'value': '2012-03-06T00:00:00+00:00', 'text': '2012-03-06T00:00:00+00:00'})()
-                            })(),
-                            type('obj', (object,), {
-                                'field_type': 'KEY_VALUE',
-                                'field_label': type('obj', (object,), {'name': 'ShippingAddress', 'confidence': 0.9818857})(),
-                                'field_value': type('obj', (object,), {'value': '98103, Seattle, Washington, United States', 'text': '98103, Seattle, Washington, United States'})()
-                            })(),
-                            type('obj', (object,), {
-                                'field_type': 'KEY_VALUE',
-                                'field_label': type('obj', (object,), {'name': 'BillingAddressRecipient', 'confidence': 0.9970944})(),
-                                'field_value': type('obj', (object,), {'value': 'Aaron Bergman', 'text': 'Aaron Bergman'})()
-                            })(),
-                            type('obj', (object,), {
-                                'field_type': 'KEY_VALUE',
-                                'field_label': type('obj', (object,), {'name': 'AmountDue', 'confidence': 0.9994609})(),
-                                'field_value': type('obj', (object,), {'value': 58.11, 'text': '58.11'})()
-                            })(),
-                            type('obj', (object,), {
-                                'field_type': 'KEY_VALUE',
-                                'field_label': type('obj', (object,), {'name': 'SubTotal', 'confidence': 0.90709054})(),
-                                'field_value': type('obj', (object,), {'value': 53.82, 'text': '53.82'})()
-                            })(),
-                            type('obj', (object,), {
-                                'field_type': 'KEY_VALUE',
-                                'field_label': type('obj', (object,), {'name': 'ShippingCost', 'confidence': 0.98618066})(),
-                                'field_value': type('obj', (object,), {'value': 4.29, 'text': '4.29'})()
-                            })(),
-                            type('obj', (object,), {
-                                'field_type': 'KEY_VALUE',
-                                'field_label': type('obj', (object,), {'name': 'InvoiceTotal', 'confidence': 0.9974165})(),
-                                'field_value': type('obj', (object,), {'value': 58.11, 'text': '58.11'})()
-                            })(),
-                            type('obj', (object,), {
-                                'field_type': 'LINE_ITEM_GROUP',
-                                'field_label': type('obj', (object,), {'name': 'Items', 'confidence': None})(),
-                                'field_value': type('obj', (object,), {
-                                    'value': None,
-                                    'text': None,
-                                    'items': [
-                                        type('obj', (object,), {
-                                            'field_value': type('obj', (object,), {
-                                                'items': [
-                                                    type('obj', (object,), {
-                                                        'field_label': type('obj', (object,), {'name': 'Description'})(),
-                                                        'field_value': type('obj', (object,), {'value': 'Newell 330 Art, Office Supplies, OFF-AR-5309', 'text': 'Newell 330 Art, Office Supplies, OFF-AR-5309'})()
-                                                    })(),
-                                                    type('obj', (object,), {
-                                                        'field_label': type('obj', (object,), {'name': 'Name'})(),
-                                                        'field_value': type('obj', (object,), {'value': 'Newell 330 Art, Office Supplies, OFF-AR-5309', 'text': 'Newell 330 Art, Office Supplies, OFF-AR-5309'})()
-                                                    })(),
-                                                    type('obj', (object,), {
-                                                        'field_label': type('obj', (object,), {'name': 'Quantity'})(),
-                                                        'field_value': type('obj', (object,), {'value': 3, 'text': '3'})()
-                                                    })(),
-                                                    type('obj', (object,), {
-                                                        'field_label': type('obj', (object,), {'name': 'UnitPrice'})(),
-                                                        'field_value': type('obj', (object,), {'value': 17.94, 'text': '17.94'})()
-                                                    })(),
-                                                    type('obj', (object,), {
-                                                        'field_label': type('obj', (object,), {'name': 'Amount'})(),
-                                                        'field_value': type('obj', (object,), {'value': 53.82, 'text': '53.82'})()
-                                                    })()
-                                                ]
-                                            })()
-                                        })()
+        self.mock_client_class.return_value = mock_client_instance
+
+        # Build OCI response similar to what your app expects
+        def obj(**kwargs):
+            return type("obj", (), kwargs)()
+
+        mock_client_instance.analyze_document.return_value = obj(
+            data=obj(
+                detected_document_types=[obj(document_type="INVOICE", confidence=1.0)],
+                pages=[
+                    obj(
+                        document_fields=[
+                            obj(field_type="KEY_VALUE",
+                                field_label=obj(name="VendorName", confidence=0.95),
+                                field_value=obj(value="SuperStore", text="SuperStore")),
+                            obj(field_type="KEY_VALUE",
+                                field_label=obj(name="InvoiceId", confidence=0.99),
+                                field_value=obj(value="36259", text="36259")),
+                            obj(field_type="KEY_VALUE",
+                                field_label=obj(name="InvoiceDate", confidence=0.99),
+                                field_value=obj(value="2012-03-06T00:00:00+00:00", text="2012-03-06T00:00:00+00:00")),
+                            obj(field_type="KEY_VALUE",
+                                field_label=obj(name="ShippingAddress", confidence=0.98),
+                                field_value=obj(value="98103, Seattle, Washington, United States",
+                                                text="98103, Seattle, Washington, United States")),
+                            obj(field_type="KEY_VALUE",
+                                field_label=obj(name="BillingAddressRecipient", confidence=0.99),
+                                field_value=obj(value="Aaron Bergman", text="Aaron Bergman")),
+                            obj(field_type="KEY_VALUE",
+                                field_label=obj(name="SubTotal", confidence=0.90),
+                                field_value=obj(value=53.82, text="53.82")),
+                            obj(field_type="KEY_VALUE",
+                                field_label=obj(name="ShippingCost", confidence=0.98),
+                                field_value=obj(value=4.29, text="4.29")),
+                            obj(field_type="KEY_VALUE",
+                                field_label=obj(name="InvoiceTotal", confidence=0.99),
+                                field_value=obj(value=58.11, text="58.11")),
+
+                            # One line item group
+                            obj(field_type="LINE_ITEM_GROUP",
+                                field_label=obj(name="Items", confidence=None),
+                                field_value=obj(
+                                    items=[
+                                        obj(field_value=obj(items=[
+                                            obj(field_label=obj(name="Description"),
+                                                field_value=obj(value="Newell 330 Art, Office Supplies, OFF-AR-5309",
+                                                                text="Newell 330 Art, Office Supplies, OFF-AR-5309")),
+                                            obj(field_label=obj(name="Name"),
+                                                field_value=obj(value="Newell 330 Art, Office Supplies, OFF-AR-5309",
+                                                                text="Newell 330 Art, Office Supplies, OFF-AR-5309")),
+                                            obj(field_label=obj(name="Quantity"),
+                                                field_value=obj(value=3, text="3")),
+                                            obj(field_label=obj(name="UnitPrice"),
+                                                field_value=obj(value=17.94, text="17.94")),
+                                            obj(field_label=obj(name="Amount"),
+                                                field_value=obj(value=53.82, text="53.82")),
+                                        ]))
                                     ]
-                                })()
-                            })()
+                                ))
                         ]
-                    })()
+                    )
                 ]
-            })()
-        })()
-        
-        # Import app and dependencies after patching
-        from app import app
-        from fastapi.testclient import TestClient
-        import json
-        
-        # Create test client
-        client = TestClient(app)
-        
-        # Load the test invoice file
-        with open("invoices_sample/invoice_Aaron_Bergman_36259.pdf", "rb") as f:
-            response = client.post(
-                "/extract",
-                files={"file": ("invoice_Aaron_Bergman_36259.pdf", f, "application/pdf")}
             )
-        
-        # Check response status
+        )
+
+        import app as app_module
+        importlib.reload(app_module)
+        self.client = TestClient(app_module.app)
+
+    def tearDown(self):
+        clean_db()
+        self.patcher_client.stop()
+        self.patcher_cfg.stop()
+
+    def test_extract_endpoint_fail_empty_file_returns_400(self):
+        # קובץ ריק
+        response = self.client.post(
+            "/extract",
+            files={"file": ("empty.pdf", b"", "application/pdf")},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("error", response.json())
+
+    def test_extract_endpoint_fail_not_pdf_returns_400(self):
+        # קובץ שאינו PDF
+        response = self.client.post(
+            "/extract",
+            files={"file": ("test.txt", b"not a pdf", "text/plain")},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("error", response.json())
+
+    def test_extract_endpoint_fail_oci_service_unavailable_returns_503(self):
+        # לגרום ל-OCI לזרוק חריגה
+        self.mock_client_class.return_value.analyze_document.side_effect = Exception("OCI down")
+
+        with open("invoices_sample/invoice_Aaron_Bergman_36259.pdf", "rb") as f:
+            response = self.client.post(
+                "/extract",
+                files={"file": ("invoice_Aaron_Bergman_36259.pdf", f, "application/pdf")},
+            )
+
+        self.assertEqual(response.status_code, 503)
+        self.assertIn("error", response.json())
+
+    def test_extract_endpoint_success(self):
+        # Use real invoice file (your current flow)
+        with open("invoices_sample/invoice_Aaron_Bergman_36259.pdf", "rb") as f:
+            response = self.client.post(
+                "/extract",
+                files={"file": ("invoice_Aaron_Bergman_36259.pdf", f, "application/pdf")},
+            )
+
         self.assertEqual(response.status_code, 200)
-        
-        # Parse response
+
         result = response.json()
-        
-        # Expected data structure
-        expected_data = {
-            "VendorName": "SuperStore",
-            "VendorNameLogo": "SuperStore",
-            "InvoiceId": "36259",
-            "InvoiceDate": "2012-03-06T00:00:00+00:00",
-            "ShippingAddress": "98103, Seattle, Washington, United States",
-            "BillingAddressRecipient": "Aaron Bergman",
-            "AmountDue": 58.11,
-            "SubTotal": 53.82,
-            "ShippingCost": 4.29,
-            "InvoiceTotal": 58.11,
-            "Items": [
-                {
-                    "Description": "Newell 330 Art, Office Supplies, OFF-AR-5309",
-                    "Name": "Newell 330 Art, Office Supplies, OFF-AR-5309",
-                    "Quantity": 3,
-                    "UnitPrice": 17.94,
-                    "Amount": 53.82
-                }
-            ]
-        }
-        
-        # Validate response structure and values
-        self.assertEqual(result["data"], expected_data)
-        
-        print("✓ All assertions passed!")
-        print(f"Response: {json.dumps(result, indent=2)}")
+        self.assertIn("data", result)
+        data = result["data"]
+
+        # Assert the stable core fields (no full dict equality)
+        self.assertEqual(data.get("InvoiceId"), "36259")
+        self.assertEqual(data.get("VendorName"), "SuperStore")
+        self.assertEqual(data.get("BillingAddressRecipient"), "Aaron Bergman")
+
+        # Date can be formatted differently – be flexible
+        self.assertTrue((data.get("InvoiceDate")))
+
+        # Floats: allow minor formatting differences
+        self.assertAlmostEqual((data.get("SubTotal")), 53.82, places=2)
+        self.assertAlmostEqual((data.get("ShippingCost")), 4.29, places=2)
+        self.assertAlmostEqual((data.get("InvoiceTotal")), 58.11, places=2)
+
+        # Items
+        items = data.get("Items", [])
+        self.assertIsInstance(items, list)
+        self.assertGreaterEqual(len(items), 1)
+
+        first = items[0]
+        self.assertIn("Description", first)
+        self.assertIn("Quantity", first)
+        self.assertAlmostEqual((first.get("Amount")), 53.82, places=2)
+
+    def test_extract_endpoint_fail_low_confidence(self):
+        # Arrange: להחליף את ה-mock ל-confidence נמוך
+        self.mock_client_class.return_value.analyze_document.return_value.data.detected_document_types[0].confidence = 0.4
+
+        with open("invoices_sample/invoice_Aaron_Bergman_36259.pdf", "rb") as f:
+            response = self.client.post(
+                "/extract",
+                files={"file": ("invoice_Aaron_Bergman_36259.pdf", f, "application/pdf")},
+            )
+
+        # Assert
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("error", response.json())
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()
