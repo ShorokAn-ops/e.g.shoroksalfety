@@ -92,7 +92,7 @@ class TestInvoiceExtraction(unittest.TestCase):
         clean_db()
         self.patcher_get_client.stop()
 
-    def test_extract_endpoint_fail_empty_file_returns_400(self):
+    def test_extract_endpoint_fail_empty_file_400(self):
         response = self.client.post(
             "/extract",
             files={"file": ("empty.pdf", b"", "application/pdf")},
@@ -101,7 +101,7 @@ class TestInvoiceExtraction(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("error", response.json())
 
-    def test_extract_endpoint_fail_not_pdf_returns_400(self):
+    def test_extract_endpoint_fail_not_pdf_400(self):
         response = self.client.post(
             "/extract",
             files={"file": ("test.txt", b"not a pdf", "text/plain")},
@@ -110,7 +110,7 @@ class TestInvoiceExtraction(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("error", response.json())
 
-    def test_extract_endpoint_fail_oci_service_unavailable_returns_503(self):
+    def test_extract_endpoint_fail_oci_service_unavailable_503(self):
         self.mock_doc_client.analyze_document.side_effect = Exception("OCI down")
 
         with open("invoices_sample/invoice_Aaron_Bergman_36259.pdf", "rb") as f:

@@ -61,7 +61,7 @@ class TestInvoicesByVendorName(unittest.TestCase):
         returned_ids = {inv["InvoiceId"] for inv in body["invoices"]}
         self.assertSetEqual(returned_ids, {"INV-101", "INV-102"})
 
-    def test_get_invoices_by_vendor_not_found_returns_unknown(self):
+    def test_get_invoices_by_vendor_not_found_unknown(self):
         response = self.client.get("/invoices/vendor/shorok")
 
         # Assert
