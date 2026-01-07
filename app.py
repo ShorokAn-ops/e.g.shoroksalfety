@@ -7,12 +7,14 @@ from db_util import get_db, init_db, save_inv_extraction
 import time
 app = FastAPI()
 
-config = oci.config.from_file()
-doc_client = oci.ai_document.AIServiceDocumentClient(config)
+def get_oci_client():  # pragma: no cover
+     config = oci.config.from_file()
+     doc_client = oci.ai_document.AIServiceDocumentClient(config)
+     return doc_client
 
 
 #“ה־http_exception_handler מאפשר טיפול מרכזי ואחיד בשגיאות HTTP, בלי לחזור על אותו קוד בכל endpoint.”
-@app.exception_handler(HTTPException)
+@app.exception_handler(HTTPException) 
 async def http_exception_handler(request: Request, exc: HTTPException):
     return JSONResponse(
         status_code=exc.status_code,
@@ -20,8 +22,8 @@ async def http_exception_handler(request: Request, exc: HTTPException):
     )
 
 
-# אם הקובץ PDF תקין
-def is_pdf(upload: UploadFile, content: bytes) -> bool:
+# לוודא שהקובץ שהועלה הוא PDF תקין.
+def is_pdf(upload: UploadFile, content: bytes) -> bool: 
     return (
         (upload.content_type == "application/pdf"
          or (upload.filename and upload.filename.lower().endswith(".pdf")))
@@ -29,8 +31,8 @@ def is_pdf(upload: UploadFile, content: bytes) -> bool:
     )
 
 
-# ניקוי ערכים מ $, רווחים וכו'ומחזיומחיר float
-def clean_money(value: str):
+# לנקות ערכים כספיים מסימנים 
+def clean_money(value: str): 
     if not value:
         return None
     v = re.sub(r"[^\d.]", "", value)
@@ -60,7 +62,8 @@ async def extract(file: UploadFile = File(...)):
     )
     # (4) 503
     try:
-        response = doc_client.analyze_document(request)
+        response = get_oci_client().analyze_document(request)
+        #response = doc_client.analyze_document(request)
     except Exception:
         raise HTTPException(
             status_code=503,
@@ -83,7 +86,7 @@ async def extract(file: UploadFile = File(...)):
                 items = []
                 rows = getattr(field_value, "items", None) or [] #כל השורות של ה־ Items בתוך החשבונית
 
-                for row in rows: #
+                for row in rows: 
                     item = {
                         "Description": None,
                         "Name": None,
@@ -92,14 +95,13 @@ async def extract(file: UploadFile = File(...)):
                         "Amount": None,
                     }
 
-                    row_value_obj = getattr(row, "field_value", None) #הערכים של הפריט
+                    row_value_obj = getattr(row, "field_value", None)
                     cols = getattr(row_value_obj, "items", None) or [] #כל העמודות/השדות של הפריט
 
                     for c in cols: 
                         c_label = getattr(c, "field_label", None) 
-                        c_conf = getattr(c_label, "confidence", None)
                         k = getattr(c_label, "name", None) #שם השדה בעמודה
-                        v_obj = getattr(c, "field_value", None) #הערך של השדה בעמודה
+                        v_obj = getattr(c, "field_value", None) 
                         v = getattr(v_obj, "text", None) if v_obj else None #הטקסט של הערך בעמודה
 
                         # ניקוי ערכים מספריים
@@ -144,11 +146,6 @@ async def extract(file: UploadFile = File(...)):
 
     save_inv_extraction(result)
     return result
-
-
-@app.get('/health')
-def health():
-    return {"status": "ok"}
 
 
 @app.get('/invoice/{invoice_id}')
@@ -218,7 +215,7 @@ async def invoices_by_vendor(vendor_name: str):
     }
 
 
-def get_invoices_by_vendor(vendor_name: str):
+def get_invoices_by_vendor(vendor_name: str): 
     with get_db() as conn:
         cursor = conn.cursor()
 
@@ -239,7 +236,7 @@ def get_invoices_by_vendor(vendor_name: str):
     return invoices
 
 
-if __name__ == "__main__":
-    import uvicorn
+if __name__ == "__main__": # pragma: no cover
+    import uvicorn 
     init_db()
     uvicorn.run(app, host="0.0.0.0", port=8080)
