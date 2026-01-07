@@ -63,7 +63,7 @@ class TestInvoiceById(unittest.TestCase):
         self.assertEqual(len(body["Items"]), 1)
         self.assertEqual(body["Items"][0]["Quantity"], 3)
 
-    def test_get_invoice_by_id_not_found_404(self):
+    def test_get_invoice_by_id_not_found(self):
         # Act
         response = self.client.get("/invoice/12345")
 
