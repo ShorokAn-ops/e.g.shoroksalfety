@@ -11,12 +11,11 @@ class TestInvoiceExtraction(unittest.TestCase):
     def setUp(self):
         init_db()
 
-        # Import app safely (now it won't try to read ~/.oci/config on import)
-        import app as app_module
-        importlib.reload(app_module)
+        import app 
+        importlib.reload(app)
 
         # Patch get_oci_client on the loaded module (survives reload correctly)
-        self.patcher_get_client = patch.object(app_module, "get_oci_client")
+        self.patcher_get_client = patch.object(app, "get_oci_client")
         self.mock_get_client = self.patcher_get_client.start()
 
         # Fake OCI client returned by get_oci_client()
@@ -87,14 +86,13 @@ class TestInvoiceExtraction(unittest.TestCase):
             )
         )
 
-        self.client = TestClient(app_module.app)
+        self.client = TestClient(app.app)
 
     def tearDown(self):
         clean_db()
         self.patcher_get_client.stop()
 
     def test_extract_endpoint_fail_empty_file_returns_400(self):
-        # קובץ ריק
         response = self.client.post(
             "/extract",
             files={"file": ("empty.pdf", b"", "application/pdf")},
@@ -104,7 +102,6 @@ class TestInvoiceExtraction(unittest.TestCase):
         self.assertIn("error", response.json())
 
     def test_extract_endpoint_fail_not_pdf_returns_400(self):
-        # קובץ שאינו PDF
         response = self.client.post(
             "/extract",
             files={"file": ("test.txt", b"not a pdf", "text/plain")},
@@ -114,7 +111,6 @@ class TestInvoiceExtraction(unittest.TestCase):
         self.assertIn("error", response.json())
 
     def test_extract_endpoint_fail_oci_service_unavailable_returns_503(self):
-        # לגרום ל-OCI לזרוק חריגה
         self.mock_doc_client.analyze_document.side_effect = Exception("OCI down")
 
         with open("invoices_sample/invoice_Aaron_Bergman_36259.pdf", "rb") as f:
@@ -164,7 +160,6 @@ class TestInvoiceExtraction(unittest.TestCase):
         self.assertAlmostEqual((first.get("Amount")), 53.82, places=2)
 
     def test_extract_endpoint_fail_low_confidence(self):
-        # Arrange: להחליף את ה-mock ל-confidence נמוך
         self.mock_doc_client.analyze_document.return_value.data.detected_document_types[0].confidence = 0.4
 
         with open("invoices_sample/invoice_Aaron_Bergman_36259.pdf", "rb") as f:

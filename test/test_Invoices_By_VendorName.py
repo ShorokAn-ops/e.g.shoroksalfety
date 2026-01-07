@@ -15,7 +15,6 @@ class TestInvoicesByVendorName(unittest.TestCase):
         clean_db()
 
     def test_get_invoices_by_vendor_success(self):
-        # Arrange: נכניס 2 חשבוניות לאותו Vendor
         vendor = "SuperStore"
 
         with get_db() as conn:
@@ -63,8 +62,7 @@ class TestInvoicesByVendorName(unittest.TestCase):
         self.assertSetEqual(returned_ids, {"INV-101", "INV-102"})
 
     def test_get_invoices_by_vendor_not_found_returns_unknown(self):
-        # Act: vendor שלא קיים
-        response = self.client.get("/invoices/vendor/NoSuchVendor")
+        response = self.client.get("/invoices/vendor/shorok")
 
         # Assert
         self.assertEqual(response.status_code, 200)

@@ -15,8 +15,7 @@ class TestInvoiceById(unittest.TestCase):
         clean_db()
 
     def test_get_invoice_by_id_success_200(self):
-        # Arrange: נכניס חשבונית + item אחד
-        invoice_id = "INV-001"
+        invoice_id = "36259"
 
         with get_db() as conn:
             cur = conn.cursor()
@@ -66,7 +65,7 @@ class TestInvoiceById(unittest.TestCase):
 
     def test_get_invoice_by_id_not_found_404(self):
         # Act
-        response = self.client.get("/invoice/DOES-NOT-EXIST")
+        response = self.client.get("/invoice/12345")
 
         # Assert
         self.assertEqual(response.status_code, 404)
