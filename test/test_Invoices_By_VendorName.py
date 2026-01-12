@@ -2,7 +2,8 @@ import unittest
 from fastapi.testclient import TestClient
 
 from app import app
-from db_util import init_db, clean_db, get_db
+from db_util import init_db, clean_db
+from db import get_db
 
 
 class TestInvoicesByVendorName(unittest.TestCase):
@@ -12,6 +13,7 @@ class TestInvoicesByVendorName(unittest.TestCase):
         self.client = TestClient(app)
 
     def tearDown(self):
+        self.client.close()
         clean_db()
 
     def test_get_invoices_by_vendor_success(self):

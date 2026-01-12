@@ -1,53 +1,40 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException, Request
+from fastapi import FastAPI, UploadFile, File, HTTPException, Request, Depends
 from fastapi.responses import JSONResponse
+from sqlalchemy.orm import Session
+
 import oci
 import base64
 import re
-from db_util import get_db, init_db, save_inv_extraction
-import time
+
+from db import get_db, get_db_session
+from helpers import is_pdf, clean_money
+import queries
+from db_util import init_db, DbUnit_save_inv_extraction  # לשמירה על התאימות שלך
+
 app = FastAPI()
 
+
 def get_oci_client():  # pragma: no cover
-     config = oci.config.from_file()
-     doc_client = oci.ai_document.AIServiceDocumentClient(config)
-     return doc_client
+    config = oci.config.from_file()
+    doc_client = oci.ai_document.AIServiceDocumentClient(config)
+    return doc_client
 
 
-#“ה־http_exception_handler מאפשר טיפול מרכזי ואחיד בשגיאות HTTP, בלי לחזור על אותו קוד בכל endpoint.”
-@app.exception_handler(HTTPException) 
+@app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
     return JSONResponse(
         status_code=exc.status_code,
-        content={"error": str(exc.detail)}
+        content={"error": str(exc.detail)},
     )
-
-
-# לוודא שהקובץ שהועלה הוא PDF תקין.
-def is_pdf(upload: UploadFile, content: bytes) -> bool: 
-    return (
-        (upload.content_type == "application/pdf"
-         or (upload.filename and upload.filename.lower().endswith(".pdf")))
-        and content.startswith(b"%PDF-")
-    )
-
-
-# לנקות ערכים כספיים מסימנים 
-def clean_money(value: str): 
-    if not value:
-        return None
-    v = re.sub(r"[^\d.]", "", value)
-    return float(v) if v else None
-
 
 @app.post("/extract")
 async def extract(file: UploadFile = File(...)):
     pdf_bytes = await file.read()
 
-    # (3) 400
     if not pdf_bytes or not is_pdf(file, pdf_bytes):
         raise HTTPException(
             status_code=400,
-            detail="Invalid document. Please upload a valid PDF invoice with high confidence."
+            detail="Invalid document. Please upload a valid PDF invoice with high confidence.",
         )
 
     encoded_pdf = base64.b64encode(pdf_bytes).decode("utf-8")
@@ -60,17 +47,17 @@ async def extract(file: UploadFile = File(...)):
             oci.ai_document.models.DocumentClassificationFeature(max_results=5),
         ],
     )
-    # (4) 503
+
     try:
         response = get_oci_client().analyze_document(request)
-        #response = doc_client.analyze_document(request)
     except Exception:
         raise HTTPException(
             status_code=503,
-            detail="The service is currently unavailable. Please try again later."
+            detail="The service is currently unavailable. Please try again later.",
         )
+
     data = {}
-    data_confidence = {} 
+    data_confidence = {}
     confidence = 0.0
 
     for page in (response.data.pages or []):
@@ -80,13 +67,13 @@ async def extract(file: UploadFile = File(...)):
             field_confidence = getattr(label, "confidence", None)
 
             field_value = getattr(field, "field_value", None)
-            field_value_text = getattr(field_value, "text", None) 
+            field_value_text = getattr(field_value, "text", None)
 
             if field.field_type == "LINE_ITEM_GROUP":
                 items = []
-                rows = getattr(field_value, "items", None) or [] #כל השורות של ה־ Items בתוך החשבונית
+                rows = getattr(field_value, "items", None) or []
 
-                for row in rows: 
+                for row in rows:
                     item = {
                         "Description": None,
                         "Name": None,
@@ -96,30 +83,29 @@ async def extract(file: UploadFile = File(...)):
                     }
 
                     row_value_obj = getattr(row, "field_value", None)
-                    cols = getattr(row_value_obj, "items", None) or [] #כל העמודות/השדות של הפריט
+                    cols = getattr(row_value_obj, "items", None) or []
 
-                    for c in cols: 
-                        c_label = getattr(c, "field_label", None) 
-                        k = getattr(c_label, "name", None) #שם השדה בעמודה
-                        v_obj = getattr(c, "field_value", None) 
-                        v = getattr(v_obj, "text", None) if v_obj else None #הטקסט של הערך בעמודה
+                    for c in cols:
+                        c_label = getattr(c, "field_label", None)
+                        k = getattr(c_label, "name", None)
+                        v_obj = getattr(c, "field_value", None)
+                        v = getattr(v_obj, "text", None) if v_obj else None
 
-                        # ניקוי ערכים מספריים
                         if k in ("UnitPrice", "Amount"):
                             v = clean_money(v)
                         elif k == "Quantity":
-                            v = int(clean_money(v)) if clean_money(v) is not None else None
+                            q = clean_money(v)
+                            v = int(q) if q is not None else None
 
                         if k in item:
-                            item[k] = v #הכנסת הערך המתאים לשדה המתאים במילון הפריט  
+                            item[k] = v
 
-                    items.append(item) # הוספת הפריט לרשימת הפריטים
+                    items.append(item)
 
                 data["Items"] = items
 
-            elif field_name: # אם יש שם שדה תקין
-                v = field_value_text #הטקסט של הערך של השדה
-
+            elif field_name:
+                v = field_value_text
                 money_fields = {"SubTotal", "ShippingCost", "InvoiceTotal", "AmountDue"}
                 if field_name in money_fields and v:
                     v = clean_money(v)
@@ -130,12 +116,11 @@ async def extract(file: UploadFile = File(...)):
     if response.data.detected_document_types:
         for doc_type in response.data.detected_document_types:
             confidence = doc_type.confidence if doc_type.confidence is not None else 0.0
-   
-    # continue (3) 400
+
     if confidence < 0.9:
         raise HTTPException(
             status_code=400,
-            detail="Invalid document. Please upload a valid PDF invoice with high confidence."
+            detail="Invalid document. Please upload a valid PDF invoice with high confidence.",
         )
 
     result = {
@@ -144,99 +129,77 @@ async def extract(file: UploadFile = File(...)):
         "dataConfidence": data_confidence,
     }
 
-    save_inv_extraction(result)
+    DbUnit_save_inv_extraction(result)
     return result
 
 
-@app.get('/invoice/{invoice_id}')
-def get_invoice_by_id(invoice_id: str):
-    with get_db() as conn: #ניהול חיבור לבסיס הנתונים
-        cursor = conn.cursor() #מצביע (cursor) שרץ על מסד הנתונים ומבצע פקודות SQL
+@app.get("/invoice/{invoice_id}")
+def get_invoice(invoice_id: str, db: Session = Depends(get_db_session)):
+    invoice = queries.get_invoice_by_id(db, invoice_id)
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
 
-        cursor.execute("""
-            SELECT InvoiceId, VendorName, InvoiceDate, BillingAddressRecipient,
-                   ShippingAddress, SubTotal, ShippingCost, InvoiceTotal
-            FROM invoices
-            WHERE InvoiceId = ? 
-        """, (invoice_id,)) #,כי SQLite מצפה ל־ tuple/ של פרמטרים ? = אבטחה ויציבות
-       
-        row = cursor.fetchone() #Tuple
-        if not row:
-            raise HTTPException(status_code=404, detail="Invoice not found")
-
-        invoice = {
-            "InvoiceId": row[0],
-            "VendorName": row[1],
-            "InvoiceDate": row[2],
-            "BillingAddressRecipient": row[3],
-            "ShippingAddress": row[4],
-            "SubTotal": row[5],
-            "ShippingCost": row[6],
-            "InvoiceTotal": row[7],
-        }
-
-        cursor.execute("""
-            SELECT Description, Name, Quantity, UnitPrice, Amount
-            FROM items
-            WHERE InvoiceId = ?
-            ORDER BY id ASC
-        """, (invoice_id,))
-        items_rows = cursor.fetchall()
-
-        invoice["Items"] = [
+    result = {
+        "InvoiceId": invoice.InvoiceId,
+        "VendorName": invoice.VendorName,
+        "InvoiceDate": invoice.InvoiceDate,
+        "BillingAddressRecipient": invoice.BillingAddressRecipient,
+        "ShippingAddress": invoice.ShippingAddress,
+        "SubTotal": invoice.SubTotal,
+        "ShippingCost": invoice.ShippingCost,
+        "InvoiceTotal": invoice.InvoiceTotal,
+        "Items": [
             {
-                "Description": r[0],
-                "Name": r[1],
-                "Quantity": r[2],
-                "UnitPrice": r[3],
-                "Amount": r[4],
+                "Description": it.Description,
+                "Name": it.Name,
+                "Quantity": it.Quantity,
+                "UnitPrice": it.UnitPrice,
+                "Amount": it.Amount,
             }
-            for r in items_rows
-        ]
-
-        return invoice
+            for it in (invoice.items or [])
+        ],
+    }
+    return result
 
 
 @app.get("/invoices/vendor/{vendor_name}")
-async def invoices_by_vendor(vendor_name: str):
-    invoices = get_invoices_by_vendor(vendor_name)
+def invoices_by_vendor(vendor_name: str, db: Session = Depends(get_db_session)):
+    invoices = queries.get_invoices_by_vendor(db, vendor_name)
 
     if not invoices:
-        return {
-            "VendorName": "Unknown Vendor",
-            "TotalInvoices": 0,
-            "invoices": []
-        }
+        return {"VendorName": "Unknown Vendor", "TotalInvoices": 0, "invoices": []}
 
-    return {
+    result = {
         "VendorName": vendor_name,
         "TotalInvoices": len(invoices),
-        "invoices": invoices
+        "invoices": [
+            {
+                "InvoiceId": inv.InvoiceId,
+                "VendorName": inv.VendorName,
+                "InvoiceDate": inv.InvoiceDate,
+                "BillingAddressRecipient": inv.BillingAddressRecipient,
+                "ShippingAddress": inv.ShippingAddress,
+                "SubTotal": inv.SubTotal,
+                "ShippingCost": inv.ShippingCost,
+                "InvoiceTotal": inv.InvoiceTotal,
+                "Items": [
+                    {
+                        "Description": it.Description,
+                        "Name": it.Name,
+                        "Quantity": it.Quantity,
+                        "UnitPrice": it.UnitPrice,
+                        "Amount": it.Amount,
+                    }
+                    for it in (inv.items or [])
+                ],
+            }
+            for inv in invoices
+        ],
     }
+    return result
 
 
-def get_invoices_by_vendor(vendor_name: str): 
-    with get_db() as conn:
-        cursor = conn.cursor()
-
-        cursor.execute("""
-            SELECT InvoiceId
-            FROM invoices
-            WHERE VendorName = ?
-            ORDER BY InvoiceDate ASC
-        """, (vendor_name,))
-        invoice_ids = [r[0] for r in cursor.fetchall()]
-
-    invoices = []
-    for inv_id in invoice_ids:
-        inv = get_invoice_by_id(inv_id)
-        if inv:
-            invoices.append(inv)
-
-    return invoices
-
-
-if __name__ == "__main__": # pragma: no cover
-    import uvicorn 
+if __name__ == "__main__":  
+    import uvicorn
     init_db()
     uvicorn.run(app, host="0.0.0.0", port=8080)
