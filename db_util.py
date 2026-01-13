@@ -2,6 +2,7 @@ from db import engine, SessionLocal
 from models import Base
 import queries
 
+
 def init_db():
     Base.metadata.create_all(bind=engine)
 

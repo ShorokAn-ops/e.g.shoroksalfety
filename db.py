@@ -21,7 +21,7 @@ engine = create_engine(
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
 
-# ✅ 1) This is for your tests that do: with get_db() as conn:
+# ✅ 1) This is for tests that do: with get_db() as conn:
 @contextmanager
 def get_db():
     """

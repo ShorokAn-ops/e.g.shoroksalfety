@@ -3,7 +3,6 @@ from sqlalchemy.orm import declarative_base, relationship
 
 Base = declarative_base()
 
-
 class Invoice(Base):
     __tablename__ = "invoices"
 
@@ -28,7 +27,6 @@ class Invoice(Base):
         cascade="all, delete-orphan",
     )
 
-
 class Confidence(Base):
     __tablename__ = "confidences"
 
@@ -42,7 +40,6 @@ class Confidence(Base):
     InvoiceTotal = Column(Float)
 
     invoice = relationship("Invoice", back_populates="confidences")
-
 
 class Item(Base):
     __tablename__ = "items"

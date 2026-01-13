@@ -1,7 +1,6 @@
 import re
 from fastapi import UploadFile
 
-
 def is_pdf(upload: UploadFile, content: bytes) -> bool:
     return (
         (upload.content_type == "application/pdf"

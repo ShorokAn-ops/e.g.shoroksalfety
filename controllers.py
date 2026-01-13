@@ -1,5 +1,4 @@
 from sqlalchemy.orm import Session
-
 import queries
 from models import Invoice
 
@@ -12,11 +11,6 @@ def save_extraction(
 ) -> Invoice:
     """
     Save invoice extraction result into the database.
-
-    This is a thin controller layer:
-    - Receives already-parsed data
-    - Delegates DB logic to queries layer
-    - Returns the saved Invoice object
     """
 
     result = {

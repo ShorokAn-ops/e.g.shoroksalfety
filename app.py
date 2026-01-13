@@ -9,7 +9,7 @@ import re
 from db import get_db, get_db_session
 from helpers import is_pdf, clean_money
 import queries
-from db_util import init_db, DbUnit_save_inv_extraction  # לשמירה על התאימות שלך
+from db_util import init_db, DbUnit_save_inv_extraction
 
 app = FastAPI()
 
