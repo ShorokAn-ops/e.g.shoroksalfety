@@ -69,7 +69,6 @@ def get_invoices_by_vendor(db: Session, vendor_name: str):
         .all()
     )
 
-    # להחזיר רשימה של חשבוניות כולל פריטים (לפי ההגדרה שלך בטופס)
     result = []
     for inv in invoices:
         inv_full = get_invoice_by_id(db, inv.InvoiceId)
@@ -79,7 +78,6 @@ def get_invoices_by_vendor(db: Session, vendor_name: str):
 
 
 def clean_db(db: Session) -> None:
-    # סדר מחיקות חשוב בגלל FK
     db.query(Item).delete()
     db.query(Confidence).delete()
     db.query(Invoice).delete()
