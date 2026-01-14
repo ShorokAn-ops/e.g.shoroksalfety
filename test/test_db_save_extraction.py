@@ -2,7 +2,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from models import Base
+from models import Base, Invoice, Item, Confidence
 import queries
 
 
@@ -18,11 +18,11 @@ def make_db(tmp_path):
     return SessionLocal()
 
 
-def test_save_and_get_invoice(tmp_path):
+def test_save_inv_extraction_success(tmp_path):
     db = make_db(tmp_path)
     try:
         result = {
-            "confidence": 0.95,
+            "confidence": 1.0,
             "data": {
                 "InvoiceId": "36259",
                 "VendorName": "SuperStore",
@@ -33,32 +33,102 @@ def test_save_and_get_invoice(tmp_path):
                         "Name": "Newell 330 Art, Office Supplies, OFF-AR-5309",
                         "Quantity": 3.0,
                         "UnitPrice": 17.94,
-                        "Amount": 53.82
+                        "Amount": 53.82,
                     }
-            ]
+                ],
             },
             "dataConfidence": {
                 "VendorName": 0.9491271,
-                "VendorNameLogo": 0.9491271,
                 "InvoiceId": 0.9995704,
-                "InvoiceDate": 0.9999474,
-                "ShippingAddress": 0.9818857,
-                "BillingAddressRecipient": 0.9970944,
-                "AmountDue": 0.9994609,
-                "SubTotal": 0.90709054,
-                "ShippingCost": 0.98618066,
-                "InvoiceTotal": 0.9974165
-            }
+                "InvoiceTotal": 0.9974165,
+            },
         }
-        
 
+        # Act
         queries.save_inv_extraction(db, result)
 
-        inv = queries.get_invoice_by_id(db, "36259")
+        # Assert (verify persisted via direct ORM query)
+        inv = db.query(Invoice).filter_by(InvoiceId="36259").first()
         assert inv is not None
-        assert inv.InvoiceId == "36259"
         assert inv.VendorName == "SuperStore"
         assert inv.InvoiceTotal == 58.11
+
+        # Optional: verify items/confidence exist
+        assert len(inv.items) == 1
+        assert inv.items[0].Amount == 53.82
+        assert inv.confidences is not None
+        assert inv.confidences.InvoiceTotal == 0.9974165
+    finally:
+        db.close()
+
+def test_save_inv_extraction_failure_missing_invoice_id(tmp_path):
+    db = make_db(tmp_path)
+    try:
+        result = {
+            "confidence": 1.0,
+            "data": {
+                # "InvoiceId": missing on purpose
+                "VendorName": "SuperStore",
+                "InvoiceTotal": 58.11,
+                "Items": [],
+            },
+            "dataConfidence": {"VendorName": 0.9},
+        }
+
+        # Act (should do nothing and not crash)
+        queries.save_inv_extraction(db, result)
+
+        # Assert: DB should remain empty
+        assert db.query(Invoice).count() == 0
+        assert db.query(Item).count() == 0
+        assert db.query(Confidence).count() == 0
+    finally:
+        db.close()
+
+
+def test_get_invoice_by_id_success(tmp_path):
+    db = make_db(tmp_path)
+    try:
+        inv = Invoice(
+            InvoiceId="36259",
+            VendorName="SuperStore",
+            InvoiceDate="Mar 06 2012",
+            InvoiceTotal=58.11,
+        )
+        inv.items = [
+            Item(
+                InvoiceId="36259",
+                Description="Newell 330 Art, Office Supplies, OFF-AR-5309",
+                Name="Newell 330 Art, Office Supplies, OFF-AR-5309",
+                Quantity=3.0,
+                UnitPrice=17.94,
+                Amount=53.82,
+            )
+        ]
+        inv.confidences = Confidence(
+            InvoiceId="36259",
+            VendorName=0.9491271,
+            InvoiceTotal=0.9974165,
+        )
+
+        db.add(inv)
+        db.commit()
+
+        # Act
+        got = queries.get_invoice_by_id(db, "36259")
+
+        # Assert (validate GET BY ID)
+        assert got is not None
+        assert got.InvoiceId == "36259"
+        assert got.VendorName == "SuperStore"
+        assert got.InvoiceTotal == 58.11
+
+        # joinedload(items) should load items
+        assert got.items is not None
+        assert len(got.items) == 1
+        assert got.items[0].Name == "Newell 330 Art, Office Supplies, OFF-AR-5309"
+        assert got.confidences is not None
+        assert got.confidences.InvoiceTotal == 0.9974165
     finally:
         db.close()
 
