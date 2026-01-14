@@ -9,7 +9,7 @@ from sqlalchemy.orm import sessionmaker
 DB_BACKEND = os.getenv("DB_BACKEND", "sqlite").lower()
 
 if DB_BACKEND == "postgres":
-    DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://user:pass@localhost/db")
+    DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://user:pass@localhost/predictions")
 else:
     DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./invoices.db")
 
