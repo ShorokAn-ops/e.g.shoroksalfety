@@ -10,9 +10,15 @@ from db import get_db, get_db_session
 from helpers import is_pdf, clean_money
 import queries
 from db_util import init_db, DbUnit_save_inv_extraction
-
+from fastapi.middleware.cors import CORSMiddleware
 app = FastAPI()
-
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://172.18.224.1:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 def get_oci_client():  # pragma: no cover
     config = oci.config.from_file()
