@@ -92,7 +92,7 @@ class TestInvoiceExtraction(unittest.TestCase):
         clean_db()
         self.patcher_get_client.stop()
 
-    def fail_empty_file(self):
+    def test_fail_empty_file(self):
         response = self.client.post(
             "/extract",
             files={"file": ("empty.pdf", b"", "application/pdf")},
@@ -101,7 +101,7 @@ class TestInvoiceExtraction(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("error", response.json())
 
-    def fail_not_pdf(self):
+    def test_fail_not_pdf(self):
         response = self.client.post(
             "/extract",
             files={"file": ("test.txt", b"not a pdf", "text/plain")},
@@ -110,7 +110,7 @@ class TestInvoiceExtraction(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("error", response.json())
 
-    def fail_oci_service_unavailable(self):
+    def test_fail_oci_service_unavailable(self):
         self.mock_doc_client.analyze_document.side_effect = Exception("OCI down")
 
         with open("invoices_sample/invoice_Aaron_Bergman_36259.pdf", "rb") as f:
@@ -159,7 +159,7 @@ class TestInvoiceExtraction(unittest.TestCase):
         self.assertIn("Quantity", first)
         self.assertAlmostEqual((first.get("Amount")), 53.82, places=2)
 
-    def fail_low_confidence(self):
+    def test_fail_low_confidence(self):
         self.mock_doc_client.analyze_document.return_value.data.detected_document_types[0].confidence = 0.4
 
         with open("invoices_sample/invoice_Aaron_Bergman_36259.pdf", "rb") as f:
